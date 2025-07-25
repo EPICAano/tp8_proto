@@ -1,21 +1,16 @@
-use tokio::net::TcpStream;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use bincode;
-mod common;
-use common::Message;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message;
+use futures_util::{SinkExt, StreamExt};
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    let mut stream = TcpStream::connect("127.0.0.1:9000").await?;
+async fn main() -> anyhow::Result<()> {
+    let url = url::Url::parse("ws://127.0.0.1:8081")?;
+    let (mut ws_stream, _) = connect_async(url).await?;
 
-    let msg = Message::Hello("Alice".to_string());
-    let data = bincode::serialize(&msg).unwrap();
-    stream.write_all(&data).await?;
+    ws_stream.send(Message::Text("Hello WebSocket!".to_string())).await?;
+    if let Some(Ok(msg)) = ws_stream.next().await {
+        println!("Réponse : {}", msg);
+    }
 
-    let mut buf = [0u8; 1024];
-    let size = stream.read(&mut buf).await?;
-    let response: Message = bincode::deserialize(&buf[..size]).unwrap();
-
-    println!("Réponse du serveur: {:?}", response);
     Ok(())
 }
